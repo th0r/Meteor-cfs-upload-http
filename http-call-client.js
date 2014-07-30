@@ -1,3 +1,5 @@
+var Uint8ArraySupported = (typeof Uint8Array !== 'undefined');
+
 /*
  * We use this instead of HTTP.call from the http package for now. If/when
  * PR 1670 is merged and released, we can probably remove this file and begin
@@ -97,7 +99,8 @@ httpCall = function(method, url, options, callback) {
     if (options.responseType === "ejson-binary") {
       xhr.responseType = "arraybuffer";
       convertToBinary = true;
-    } else {
+    // Fix Android bug - it doesn't allow to set `xhr.responseType` to `undefined`
+    } else if (options.responseType) {
       xhr.responseType = options.responseType;
     }
 
@@ -144,7 +147,7 @@ httpCall = function(method, url, options, callback) {
           }
 
           // Add support for a custom responseType: "ejson-binary"
-          if (convertToBinary && typeof ArrayBuffer !== "undefined" && typeof Uint8Array !== "undefined" && body instanceof ArrayBuffer) {
+          if (convertToBinary && Uint8ArraySupported && typeof ArrayBuffer !== "undefined" && body instanceof ArrayBuffer) {
             var view = new Uint8Array(body);
             var len = body.byteLength;
             var binaryBody = EJSON.newBinary(len);
@@ -193,6 +196,12 @@ httpCall = function(method, url, options, callback) {
         }
       }
     };
+
+    // Fix Android 4.0.x - 4.1.x bug with sending empty request body
+    // https://github.com/scottjehl/Device-Bugs/issues/34
+    if (Uint8ArraySupported && content instanceof Uint8Array) {
+      content = content.buffer;
+    }
 
     // send it on its way
     xhr.send(content);
